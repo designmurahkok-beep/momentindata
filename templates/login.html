@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Masuk — Sistem Data Undangan Pernikahan Digital{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-[#F6F2E6] relative overflow-hidden">
+    
+    <!-- Decorative subtle background accents matching palette -->
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-[#EACE9C]/30 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-[#33443C]/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="max-w-md w-full space-y-8 relative z-10">
+        <!-- Logo & Branding -->
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-pine text-brand-gold shadow-xl shadow-brand-pine/20 mb-4 border border-brand-pine">
+                <i data-lucide="heart-handshake" class="w-8 h-8"></i>
+            </div>
+            <h1 class="text-3xl font-serif font-bold text-brand-charcoal tracking-wide">WEDDING INVITATION DATA</h1>
+            <p class="mt-2 text-sm text-slate-600 font-medium">Sistem Pengumpulan & Manajemen Data Undangan Digital</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="glass-card rounded-3xl shadow-xl shadow-black/5 p-8 border border-[#EDE4D0] bg-white/95">
+            <h2 class="text-xl font-bold text-brand-charcoal mb-6 flex items-center gap-2">
+                <i data-lucide="lock" class="w-5 h-5 text-brand-pine"></i>
+                Masuk ke Portal
+            </h2>
+
+            <form method="POST" action="{{ url_for('login_page') }}" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Username</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="user" class="w-5 h-5"></i>
+                        </span>
+                        <input type="text" name="username" id="usernameInput" required value="{{ username or '' }}"
+                               class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-brand-pine focus:ring-4 focus:ring-brand-gold/25 text-brand-charcoal text-sm font-medium transition outline-none"
+                               placeholder="Masukkan username Anda">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Password</label>
+                    </div>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="key" class="w-5 h-5"></i>
+                        </span>
+                        <input type="password" name="password" id="passwordInput" required
+                               class="w-full pl-11 pr-12 py-3 rounded-xl border border-slate-200 focus:border-brand-pine focus:ring-4 focus:ring-brand-gold/25 text-brand-charcoal text-sm font-medium transition outline-none"
+                               placeholder="Masukkan password">
+                        <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
+                            <i id="eyeIcon" data-lucide="eye" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit"
+                        class="w-full py-3.5 px-4 bg-brand-pine hover:bg-brand-800 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-pine/20 transition duration-200 flex items-center justify-center gap-2">
+                    <span>Masuk Sekarang</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </form>
+
+            <!-- Quick Demo Credentials Picker -->
+            <div class="mt-8 pt-6 border-t border-slate-100">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 text-center">Akun Bawaan (Klik untuk Mengisi):</p>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" onclick="fillDemo('admin', 'admin123')"
+                            class="p-2.5 rounded-xl border border-[#EDE4D0] bg-[#FAF8F2] hover:bg-white text-left transition group">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-brand-charcoal group-hover:text-brand-pine">Admin</span>
+                            <span class="text-[10px] bg-brand-pine text-white px-2 py-0.5 rounded font-semibold">Staf</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1 font-mono">admin / admin123</p>
+                    </button>
+
+                    <button type="button" onclick="fillDemo('rizky_anisa', 'pass123')"
+                            class="p-2.5 rounded-xl border border-[#EDE4D0] bg-[#FAF8F2] hover:bg-white text-left transition group">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-brand-charcoal group-hover:text-brand-pine">Client Demo</span>
+                            <span class="text-[10px] bg-brand-gold text-brand-charcoal px-2 py-0.5 rounded font-bold">Pengantin</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1 font-mono">rizky_anisa / pass123</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Info -->
+        <p class="text-center text-xs text-slate-500">
+            Akun dibuatkan secara khusus oleh tim Admin. Mengalami kendala? Hubungi kontak WhatsApp CS kami.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function togglePassword() {
+        const inp = document.getElementById('passwordInput');
+        const eye = document.getElementById('eyeIcon');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            eye.setAttribute('data-lucide', 'eye-off');
+        } else {
+            inp.type = 'password';
+            eye.setAttribute('data-lucide', 'eye');
+        }
+        lucide.createIcons();
+    }
+
+    function fillDemo(u, p) {
+        document.getElementById('usernameInput').value = u;
+        document.getElementById('passwordInput').value = p;
+        showToast(`Form diisi dengan akun ${u}`, 'info');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" width="100%" height="100%">
+  <rect width="400" height="260" fill="#F8FAFC" rx="12"/>
+  <rect x="12" y="12" width="376" height="236" fill="none" stroke="#D97706" stroke-width="1.5" stroke-dasharray="6 4" rx="8" opacity="0.6"/>
+  <circle cx="200" cy="85" r="42" fill="#D97706" opacity="0.15"/>
+  <path d="M175 90 C185 70, 215 70, 225 90 C215 110, 185 110, 175 90 Z" fill="none" stroke="#1E293B" stroke-width="2"/>
+  <circle cx="200" cy="80" r="8" fill="#D97706"/>
+  <text x="200" y="145" font-family="'Playfair Display', Georgia, serif" font-size="18" font-weight="bold" fill="#1E293B" text-anchor="middle">Modern Minimalist Luxe</text>
+  <text x="200" y="170" font-family="'Inter', sans-serif" font-size="12" font-weight="600" fill="#D97706" text-anchor="middle" letter-spacing="1.5">CONTEMPORARY GOLD</text>
+  <rect x="130" y="195" width="140" height="26" rx="13" fill="#1E293B" opacity="0.9"/>
+  <text x="200" y="212" font-family="'Inter', sans-serif" font-size="11" font-weight="600" fill="white" text-anchor="middle">PREVIEW TEMA</text>
+</svg>

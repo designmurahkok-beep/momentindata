@@ -1,0 +1,1820 @@
+{% extends "base.html" %}
+
+{% block title %}{{ couple_name or 'Dashboard Pengantin' }} — Sistem Data Undangan{% endblock %}
+
+{% block extra_head %}
+<style>
+    .tab-btn.active {
+        background-color: #33443C;
+        color: #F6F2E6;
+        border-color: #33443C;
+    }
+    .badge-empty {
+        background-color: #F6F2E6;
+        color: #78716C;
+        border: 1px solid #EDE4D0;
+    }
+    .badge-partial {
+        background-color: #EACE9C;
+        color: #292929;
+        border: 1px solid #D5B47B;
+    }
+    .badge-complete {
+        background-color: #33443C;
+        color: #F6F2E6;
+        border: 1px solid #2A3831;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col bg-[#F8F6F0]">
+    
+    <!-- Top Admin Banner if editing client as admin -->
+    {% if is_admin %}
+    <div class="bg-brand-pine text-brand-gold px-4 py-2.5 text-sm font-medium flex items-center justify-between shadow-sm sticky top-0 z-50 border-b border-brand-700">
+        <div class="flex items-center gap-2 max-w-7xl mx-auto w-full">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-brand-gold"></i>
+            <span><b>Mode Administrator:</b> Anda sedang mengedit data undangan untuk client <b>{{ couple_name or 'Client' }}</b> (ID #{{ client_id }}).</span>
+            <a href="{{ url_for('admin_dashboard') }}" class="ml-auto bg-brand-charcoal hover:bg-black text-brand-gold text-xs px-3 py-1.5 rounded-xl transition font-semibold border border-brand-gold/30">
+                Kembali ke Panel Admin
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main Navigation Header -->
+    <header class="bg-white border-b border-[#EDE4D0] sticky {% if is_admin %}top-[41px]{% else %}top-0{% endif %} z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-brand-pine text-brand-gold flex items-center justify-center shadow-sm border border-brand-pine">
+                    <i data-lucide="heart" class="w-5 h-5 fill-current"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 id="headerCoupleName" class="text-lg font-serif font-bold text-brand-charcoal tracking-wide">Memuat...</h1>
+                        <span id="clientStatusBadge" class="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-[#F6F2E6] text-brand-charcoal border border-[#EDE4D0]">
+                            -
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500">Pengisian Data & Pratinjau Undangan Digital</p>
+                </div>
+            </div>
+
+            <!-- Autosave & Overall Progress -->
+            <div class="flex items-center flex-wrap gap-4 ml-auto">
+                <!-- Save Status Indicator -->
+                <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-xl bg-[#FAF8F2] border border-[#EDE4D0]">
+                    <span id="saveStatusDot" class="w-2.5 h-2.5 rounded-full bg-brand-pine animate-pulse"></span>
+                    <span id="saveStatusText" class="text-brand-charcoal">Tersimpan otomatis</span>
+                </div>
+
+                <!-- Overall Progress Gauge (Clean Flat, no gradient) -->
+                <div class="flex items-center gap-2">
+                    <div class="text-right">
+                        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Kelengkapan</div>
+                        <div id="overallProgressText" class="text-sm font-bold text-brand-pine">0%</div>
+                    </div>
+                    <div class="w-24 bg-[#EDE4D0] h-3 rounded-full overflow-hidden border border-[#E2D3B8]">
+                        <div id="overallProgressBar" class="bg-brand-pine h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Account Actions (Tombol tandai selesai telah dihapus) -->
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="openPasswordModal()"
+                            class="p-2 text-brand-charcoal hover:bg-[#FAF8F2] rounded-xl border border-[#EDE4D0] transition" title="Ganti Password">
+                        <i data-lucide="key-round" class="w-4 h-4"></i>
+                    </button>
+
+                    <a href="{{ url_for('logout') }}"
+                       class="p-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl border border-rose-200 transition" title="Keluar">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 7 Sections Tab Bar (Scrollable on mobile) -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-[#EDE4D0] bg-[#FAF8F2]">
+            <div class="flex items-center gap-2 overflow-x-auto py-2 no-scrollbar text-xs font-medium">
+                <button type="button" onclick="switchTab('overview')" id="tab-overview"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5 active">
+                    <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+                    <span>Ikhtisar Progres</span>
+                </button>
+
+                <button type="button" onclick="switchTab('theme')" id="tab-theme"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5">
+                    <i data-lucide="palette" class="w-3.5 h-3.5"></i>
+                    <span>1. Tema</span>
+                    <span id="badge-theme" class="text-[10px] px-1.5 py-0.2 rounded-full font-bold badge-empty">-</span>
+                </button>
+
+                <button type="button" onclick="switchTab('groom_bride')" id="tab-groom_bride"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5">
+                    <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                    <span>2. Biodata</span>
+                    <span id="badge-groom_bride" class="text-[10px] px-1.5 py-0.2 rounded-full font-bold badge-empty">-</span>
+                </button>
+
+                <button type="button" onclick="switchTab('events')" id="tab-events"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5">
+                    <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                    <span>3. Acara</span>
+                    <span id="badge-events" class="text-[10px] px-1.5 py-0.2 rounded-full font-bold badge-empty">-</span>
+                </button>
+
+                <button type="button" onclick="switchTab('story')" id="tab-story"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5">
+                    <i data-lucide="book-heart" class="w-3.5 h-3.5"></i>
+                    <span>4. Love Story</span>
+                    <span id="badge-story" class="text-[10px] px-1.5 py-0.2 rounded-full font-bold badge-empty">-</span>
+                </button>
+
+                <button type="button" onclick="switchTab('gifts')" id="tab-gifts"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5">
+                    <i data-lucide="gift" class="w-3.5 h-3.5"></i>
+                    <span>5. Kado Digital</span>
+                    <span id="badge-gifts" class="text-[10px] px-1.5 py-0.2 rounded-full font-bold badge-empty">-</span>
+                </button>
+
+                <button type="button" onclick="switchTab('inviters')" id="tab-inviters"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5">
+                    <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+                    <span>6. Turut Mengundang</span>
+                    <span id="badge-inviters" class="text-[10px] px-1.5 py-0.2 rounded-full font-bold badge-empty">-</span>
+                </button>
+
+                <button type="button" onclick="switchTab('music')" id="tab-music"
+                        class="tab-btn px-3 py-2 rounded-xl border border-transparent whitespace-nowrap transition flex items-center gap-1.5">
+                    <i data-lucide="music" class="w-3.5 h-3.5"></i>
+                    <span>7. Backsound</span>
+                    <span id="badge-music" class="text-[10px] px-1.5 py-0.2 rounded-full font-bold badge-empty">-</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full pb-28">
+
+        <!-- ================= SECTION: OVERVIEW ================= -->
+        <div id="section-overview" class="tab-pane space-y-6">
+            <!-- Hero Welcome Card (Clean solid background) -->
+            <div class="rounded-3xl p-6 sm:p-8 bg-white border border-[#EDE4D0] shadow-sm">
+                <div class="max-w-3xl">
+                    <span class="text-xs font-bold uppercase tracking-widest text-brand-charcoal bg-brand-gold px-3.5 py-1 rounded-full border border-brand-500/30">Selamat Datang</span>
+                    <h2 class="text-2xl sm:text-3xl font-serif font-bold text-brand-charcoal mt-2.5">Formulir Data Undangan Pernikahan</h2>
+                    <p class="text-sm text-slate-600 mt-2 leading-relaxed">
+                        Silakan lengkapi data undangan pada 7 bagian di bawah ini. Semua data tersimpan otomatis. Setelah selesai mengisi hingga bagian Backsound musik, Anda dapat melakukan <b>Pratinjau Data Lengkap</b> dan <b>Menyimpan Data</b>.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 7 Section Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                
+                <!-- 1. Tema -->
+                <div onclick="switchTab('theme')" class="bg-white rounded-2xl p-5 border border-[#EDE4D0] hover:border-brand-pine hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="palette" class="w-5 h-5"></i>
+                            </span>
+                            <span id="card-badge-theme" class="text-xs px-2.5 py-0.5 rounded-full font-semibold badge-empty">Belum diisi</span>
+                        </div>
+                        <h3 class="text-base font-bold text-brand-charcoal">1. Tema Undangan</h3>
+                        <p class="text-xs text-slate-500 mt-1">Nama tema desain undangan yang diinginkan.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-brand-pine">
+                        <span>Isi Tema</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                </div>
+
+                <!-- 2. Biodata -->
+                <div onclick="switchTab('groom_bride')" class="bg-white rounded-2xl p-5 border border-[#EDE4D0] hover:border-brand-pine hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="users" class="w-5 h-5"></i>
+                            </span>
+                            <span id="card-badge-groom_bride" class="text-xs px-2.5 py-0.5 rounded-full font-semibold badge-empty">Belum diisi</span>
+                        </div>
+                        <h3 class="text-base font-bold text-brand-charcoal">2. Biodata Pengantin</h3>
+                        <p class="text-xs text-slate-500 mt-1">Nama lengkap, nama panggilan, foto, orang tua, dan Instagram kedua mempelai.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-brand-pine">
+                        <span>Isi Biodata</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                </div>
+
+                <!-- 3. Detail Acara -->
+                <div onclick="switchTab('events')" class="bg-white rounded-2xl p-5 border border-[#EDE4D0] hover:border-brand-pine hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="calendar" class="w-5 h-5"></i>
+                            </span>
+                            <span id="card-badge-events" class="text-xs px-2.5 py-0.5 rounded-full font-semibold badge-empty">Belum diisi</span>
+                        </div>
+                        <h3 class="text-base font-bold text-brand-charcoal">3. Rangkaian Acara</h3>
+                        <p class="text-xs text-slate-500 mt-1">Akad nikah, resepsi, atau acara lain lengkap dengan waktu, tempat, dan Maps.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-brand-pine">
+                        <span>Isi Detail Acara</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                </div>
+
+                <!-- 4. Love Story -->
+                <div onclick="switchTab('story')" class="bg-white rounded-2xl p-5 border border-[#EDE4D0] hover:border-brand-pine hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="book-heart" class="w-5 h-5"></i>
+                            </span>
+                            <span id="card-badge-story" class="text-xs px-2.5 py-0.5 rounded-full font-semibold badge-empty">Belum diisi</span>
+                        </div>
+                        <h3 class="text-base font-bold text-brand-charcoal">4. Love Story</h3>
+                        <p class="text-xs text-slate-500 mt-1">Kisah perjalanan cinta per fase atau tahun beserta foto kenangan.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-brand-pine">
+                        <span>Isi Cerita</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                </div>
+
+                <!-- 5. Kado Digital -->
+                <div onclick="switchTab('gifts')" class="bg-white rounded-2xl p-5 border border-[#EDE4D0] hover:border-brand-pine hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="gift" class="w-5 h-5"></i>
+                            </span>
+                            <span id="card-badge-gifts" class="text-xs px-2.5 py-0.5 rounded-full font-semibold badge-empty">Belum diisi</span>
+                        </div>
+                        <h3 class="text-base font-bold text-brand-charcoal">5. Kado Digital</h3>
+                        <p class="text-xs text-slate-500 mt-1">Rekening bank, e-wallet, dan alamat pengiriman kado fisik.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-brand-pine">
+                        <span>Isi Kado Digital</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                </div>
+
+                <!-- 6. Turut Mengundang -->
+                <div onclick="switchTab('inviters')" class="bg-white rounded-2xl p-5 border border-[#EDE4D0] hover:border-brand-pine hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="user-check" class="w-5 h-5"></i>
+                            </span>
+                            <span id="card-badge-inviters" class="text-xs px-2.5 py-0.5 rounded-full font-semibold badge-empty">Belum diisi</span>
+                        </div>
+                        <h3 class="text-base font-bold text-brand-charcoal">6. Turut Mengundang</h3>
+                        <p class="text-xs text-slate-500 mt-1">Daftar nama keluarga besar atau pihak yang turut mengundang (dapat diatur urutan).</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-brand-pine">
+                        <span>Isi Nama Keluarga</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                </div>
+
+                <!-- 7. Backsound -->
+                <div onclick="switchTab('music')" class="bg-white rounded-2xl p-5 border border-[#EDE4D0] hover:border-brand-pine hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="music" class="w-5 h-5"></i>
+                            </span>
+                            <span id="card-badge-music" class="text-xs px-2.5 py-0.5 rounded-full font-semibold badge-empty">Belum diisi</span>
+                        </div>
+                        <h3 class="text-base font-bold text-brand-charcoal">7. Backsound Musik</h3>
+                        <p class="text-xs text-slate-500 mt-1">Pilih lagu romantis dari koleksi kami atau unggah file lagu Anda sendiri.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-brand-pine">
+                        <span>Pilih Musik & Selesai</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION 1: TEMA (HANYA INPUT NAMA TEMA) ================= -->
+        <div id="section-theme" class="tab-pane hidden space-y-6">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-[#EDE4D0] shadow-sm space-y-6">
+                <div class="pb-4 border-b border-slate-100">
+                    <h2 class="text-lg font-bold text-brand-charcoal">1. Tema Undangan Pernikahan</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Tuliskan nama konsep tema desain undangan yang Anda inginkan.</p>
+                </div>
+
+                <!-- Input Nama Tema Saja (Nuansa warna & catatan khusus telah dihapuskan) -->
+                <div>
+                    <label class="block text-xs font-bold text-brand-charcoal uppercase tracking-wider mb-2">
+                        Nama Tema Undangan <span class="text-rose-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-brand-pine">
+                            <i data-lucide="palette" class="w-5 h-5"></i>
+                        </span>
+                        <input type="text" id="theme_name" oninput="triggerAutosave()"
+                               class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-brand-pine focus:ring-2 focus:ring-brand-gold/20 text-brand-charcoal text-sm font-medium outline-none transition bg-[#FAF8F2]"
+                               placeholder="Contoh: Emerald Pine & Gold, Rustic Romance, Modern Minimalist Floral, Classic Monochrome, dll.">
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-1.5">Tuliskan nama tema atau konsep visual yang Anda inginkan.</p>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION 2: BIODATA PENGANTIN ================= -->
+        <div id="section-groom_bride" class="tab-pane hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- Mempelai Pria -->
+                <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[#EDE4D0] shadow-sm space-y-4">
+                    <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+                        <span class="w-8 h-8 rounded-xl bg-brand-100 text-brand-pine flex items-center justify-center font-bold">
+                            <i data-lucide="user" class="w-4 h-4"></i>
+                        </span>
+                        <div>
+                            <h3 class="text-base font-bold text-brand-charcoal">Mempelai Pria (Groom)</h3>
+                            <p class="text-[11px] text-slate-500">Data identitas calon mempelai pria</p>
+                        </div>
+                    </div>
+
+                    <!-- Photo Upload Groom -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Foto Mempelai Pria <span class="text-slate-400 font-normal">(Maks 5 MB)</span></label>
+                        <div class="flex items-center gap-4">
+                            <div class="w-20 h-24 rounded-2xl border-2 border-dashed border-brand-200 bg-[#FAF8F2] flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                                <img id="groom_photo_preview" src="" alt="Groom" class="w-full h-full object-cover hidden">
+                                <i id="groom_photo_placeholder" data-lucide="image" class="w-8 h-8 text-slate-300"></i>
+                            </div>
+                            <div class="flex-1 space-y-1.5">
+                                <input type="file" id="groom_photo_input" accept="image/*" onchange="uploadImage(this, 'groom_photo')" class="hidden">
+                                <button type="button" onclick="document.getElementById('groom_photo_input').click()"
+                                        class="px-3 py-1.5 text-xs font-semibold bg-[#FAF8F2] hover:bg-[#EDE4D0] text-brand-charcoal rounded-xl transition flex items-center gap-1.5 border border-[#EDE4D0]">
+                                    <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                                    Pilih Foto Pria
+                                </button>
+                                <p class="text-[11px] text-slate-400">Format JPG, PNG, WEBP</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap & Gelar <span class="text-rose-500">*</span></label>
+                        <input type="text" id="groom_name" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Rizky Pratama, S.T.">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Panggilan <span class="text-rose-500">*</span></label>
+                        <input type="text" id="groom_nickname" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Rizky">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Putra ke-berapa?</label>
+                        <input type="text" id="groom_child_order" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Putra pertama dari, Putra bungsu dari">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap Ayah <span class="text-rose-500">*</span></label>
+                        <input type="text" id="groom_father" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Bpk. H. Bambang Soedirman">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap Ibu <span class="text-rose-500">*</span></label>
+                        <input type="text" id="groom_mother" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Ibu Hj. Siti Nurhaliza">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Akun Instagram <span class="text-slate-400 font-normal">(Opsional)</span></label>
+                        <input type="text" id="groom_instagram" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="@username_pria">
+                    </div>
+                </div>
+
+                <!-- Mempelai Wanita -->
+                <div class="bg-white rounded-3xl p-6 sm:p-7 border border-[#EDE4D0] shadow-sm space-y-4">
+                    <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+                        <span class="w-8 h-8 rounded-xl bg-brand-gold text-brand-charcoal flex items-center justify-center font-bold">
+                            <i data-lucide="user" class="w-4 h-4"></i>
+                        </span>
+                        <div>
+                            <h3 class="text-base font-bold text-brand-charcoal">Mempelai Wanita (Bride)</h3>
+                            <p class="text-[11px] text-slate-500">Data identitas calon mempelai wanita</p>
+                        </div>
+                    </div>
+
+                    <!-- Photo Upload Bride -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Foto Mempelai Wanita <span class="text-slate-400 font-normal">(Maks 5 MB)</span></label>
+                        <div class="flex items-center gap-4">
+                            <div class="w-20 h-24 rounded-2xl border-2 border-dashed border-brand-200 bg-[#FAF8F2] flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                                <img id="bride_photo_preview" src="" alt="Bride" class="w-full h-full object-cover hidden">
+                                <i id="bride_photo_placeholder" data-lucide="image" class="w-8 h-8 text-slate-300"></i>
+                            </div>
+                            <div class="flex-1 space-y-1.5">
+                                <input type="file" id="bride_photo_input" accept="image/*" onchange="uploadImage(this, 'bride_photo')" class="hidden">
+                                <button type="button" onclick="document.getElementById('bride_photo_input').click()"
+                                        class="px-3 py-1.5 text-xs font-semibold bg-[#FAF8F2] hover:bg-[#EDE4D0] text-brand-charcoal rounded-xl transition flex items-center gap-1.5 border border-[#EDE4D0]">
+                                    <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                                    Pilih Foto Wanita
+                                </button>
+                                <p class="text-[11px] text-slate-400">Format JPG, PNG, WEBP</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap & Gelar <span class="text-rose-500">*</span></label>
+                        <input type="text" id="bride_name" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Anisa Putri Maharani, S.Kom.">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Panggilan <span class="text-rose-500">*</span></label>
+                        <input type="text" id="bride_nickname" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Anisa">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Putri ke-berapa?</label>
+                        <input type="text" id="bride_child_order" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Putri kedua dari, Putri pertama dari">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap Ayah <span class="text-rose-500">*</span></label>
+                        <input type="text" id="bride_father" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Bpk. Ir. H. Joko Santoso">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap Ibu <span class="text-rose-500">*</span></label>
+                        <input type="text" id="bride_mother" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="Contoh: Ibu Hj. Ratna Juwita">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Akun Instagram <span class="text-slate-400 font-normal">(Opsional)</span></label>
+                        <input type="text" id="bride_instagram" oninput="triggerAutosave()"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                               placeholder="@username_wanita">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION 3: DETAIL ACARA ================= -->
+        <div id="section-events" class="tab-pane hidden space-y-6">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-[#EDE4D0] shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-bold text-brand-charcoal">3. Rangkaian Acara Pernikahan</h2>
+                        <p class="text-xs text-slate-500">Anda dapat menambahkan lebih dari satu acara (contoh: Akad Nikah, Pemberkatan, Resepsi, Unduh Mantu, dsb).</p>
+                    </div>
+                    <button type="button" onclick="addEventRow()"
+                            class="px-4 py-2 bg-brand-pine hover:bg-brand-charcoal text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5 flex-shrink-0">
+                        <i data-lucide="plus" class="w-4 h-4 text-brand-gold"></i>
+                        Tambah Acara
+                    </button>
+                </div>
+
+                <div id="eventsList" class="space-y-5">
+                    <!-- Events injected dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION 4: LOVE STORY ================= -->
+        <div id="section-story" class="tab-pane hidden space-y-6">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-[#EDE4D0] shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-bold text-brand-charcoal">4. Perjalanan Kisah Cinta (Love Story)</h2>
+                        <p class="text-xs text-slate-500">Bagikan momen-momen berharga pertemuan hingga keputusan mengikat janji suci.</p>
+                    </div>
+                    <button type="button" onclick="addStoryRow()"
+                            class="px-4 py-2 bg-brand-pine hover:bg-brand-charcoal text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5 flex-shrink-0">
+                        <i data-lucide="plus" class="w-4 h-4 text-brand-gold"></i>
+                        Tambah Cerita
+                    </button>
+                </div>
+
+                <div id="storiesList" class="space-y-5">
+                    <!-- Stories injected dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION 5: KADO DIGITAL (QRIS DIHAPUS) ================= -->
+        <div id="section-gifts" class="tab-pane hidden space-y-6">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-[#EDE4D0] shadow-sm space-y-8">
+                <div>
+                    <h2 class="text-lg font-bold text-brand-charcoal">5. Kado Digital & Kirim Hadiah Fisik</h2>
+                    <p class="text-xs text-slate-500">Daftar rekening bank, e-wallet, dan alamat kirim kado fisik untuk tamu undangan.</p>
+                </div>
+
+                <!-- 1. Rekening Bank -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-bold text-brand-charcoal uppercase tracking-wider flex items-center gap-2">
+                            <i data-lucide="credit-card" class="w-4 h-4 text-brand-pine"></i>
+                            Daftar Rekening Bank
+                        </h3>
+                        <button type="button" onclick="addBankRow()" class="text-xs text-brand-pine font-semibold hover:text-brand-charcoal flex items-center gap-1">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Tambah Bank
+                        </button>
+                    </div>
+                    <div id="bankAccountsList" class="space-y-3">
+                        <!-- Dynamic Bank Rows -->
+                    </div>
+                </div>
+
+                <!-- 2. E-Wallet -->
+                <div class="pt-6 border-t border-slate-100">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-bold text-brand-charcoal uppercase tracking-wider flex items-center gap-2">
+                            <i data-lucide="smartphone" class="w-4 h-4 text-brand-pine"></i>
+                            Dompet Digital (E-Wallet)
+                        </h3>
+                        <button type="button" onclick="addEwalletRow()" class="text-xs text-brand-pine font-semibold hover:text-brand-charcoal flex items-center gap-1">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Tambah E-Wallet
+                        </button>
+                    </div>
+                    <div id="ewalletsList" class="space-y-3">
+                        <!-- Dynamic E-Wallet Rows -->
+                    </div>
+                </div>
+
+                <!-- 3. Alamat Kado Fisik -->
+                <div class="pt-6 border-t border-slate-100">
+                    <h3 class="text-xs font-bold text-brand-charcoal uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <i data-lucide="package" class="w-4 h-4 text-brand-pine"></i>
+                        Alamat Pengiriman Kado Fisik <span class="text-slate-400 font-normal lowercase">(opsional)</span>
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Nama Penerima</label>
+                            <input type="text" id="physical_recipient" oninput="triggerAutosave()"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                                   placeholder="Contoh: Rizky / Anisa">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">No. Handphone Penerima</label>
+                            <input type="text" id="physical_phone" oninput="triggerAutosave()"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                                   placeholder="Contoh: 081234567890">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Alamat Lengkap Pengiriman</label>
+                            <textarea id="physical_address" oninput="triggerAutosave()" rows="2"
+                                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                                      placeholder="Nama Jalan, No. Rumah, RT/RW, Kelurahan, Kecamatan, Kota, Kode Pos..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION 6: TURUT MENGUNDANG ================= -->
+        <div id="section-inviters" class="tab-pane hidden space-y-6">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-[#EDE4D0] shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-bold text-brand-charcoal">6. Daftar Turut Mengundang</h2>
+                        <p class="text-xs text-slate-500">Nama keluarga besar, tokoh, atau kerabat yang turut mengundang. Anda dapat menaik-turunkan urutan susunan nama.</p>
+                    </div>
+                    <button type="button" onclick="addInviterRow()"
+                            class="px-4 py-2 bg-brand-pine hover:bg-brand-charcoal text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5 flex-shrink-0">
+                        <i data-lucide="plus" class="w-4 h-4 text-brand-gold"></i>
+                        Tambah Nama
+                    </button>
+                </div>
+
+                <div id="invitersList" class="space-y-3">
+                    <!-- Dynamic Inviters Rows -->
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION 7: BACKSOUND & PREVIEW/SIMPAN DATA ================= -->
+        <div id="section-music" class="tab-pane hidden space-y-6">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-[#EDE4D0] shadow-sm space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-brand-charcoal">7. Pilihan Backsound Musik</h2>
+                    <p class="text-xs text-slate-500">Musik latar yang akan diputar otomatis saat tamu membuka undangan digital Anda.</p>
+                </div>
+
+                <!-- Music Choice Segmented Control -->
+                <div class="flex rounded-2xl bg-[#FAF8F2] p-1.5 max-w-md border border-[#EDE4D0]">
+                    <button type="button" id="btnMusicTypePreset" onclick="setMusicChoiceType('preset')"
+                            class="flex-1 py-2 text-xs font-bold rounded-xl transition text-brand-charcoal bg-white shadow-sm flex items-center justify-center gap-2">
+                        <i data-lucide="library" class="w-3.5 h-3.5 text-brand-pine"></i>
+                        Pilihan Koleksi Kami
+                    </button>
+                    <button type="button" id="btnMusicTypeUpload" onclick="setMusicChoiceType('upload')"
+                            class="flex-1 py-2 text-xs font-bold rounded-xl transition text-slate-500 hover:text-brand-charcoal flex items-center justify-center gap-2">
+                        <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i>
+                        Unggah Musik Sendiri
+                    </button>
+                </div>
+
+                <!-- PRESET MUSIC LIST -->
+                <div id="musicPresetContainer" class="space-y-3">
+                    <p class="text-xs font-bold text-brand-charcoal uppercase tracking-wider">Daftar Lagu Rekomendasi:</p>
+                    <div id="presetMusicsList" class="space-y-3">
+                        <!-- Injected by JS with Play/Pause button -->
+                    </div>
+                </div>
+
+                <!-- UPLOAD CUSTOM MUSIC -->
+                <div id="musicUploadContainer" class="hidden space-y-4 pt-2">
+                    <div class="p-6 border-2 border-dashed border-brand-200 rounded-3xl bg-[#FAF8F2] text-center">
+                        <i data-lucide="music" class="w-10 h-10 text-brand-pine mx-auto mb-2"></i>
+                        <h4 class="text-sm font-bold text-brand-charcoal">Pilih File Musik Anda</h4>
+                        <p class="text-xs text-slate-400 mt-1">Format didukung: MP3, WAV, M4A (Maksimal 10 MB)</p>
+                        
+                        <input type="file" id="music_file_input" accept="audio/*" onchange="uploadAudio(this)" class="hidden">
+                        <button type="button" onclick="document.getElementById('music_file_input').click()"
+                                class="mt-4 px-4 py-2 bg-white hover:bg-slate-50 text-brand-charcoal border border-[#EDE4D0] rounded-xl text-xs font-semibold shadow-sm transition inline-flex items-center gap-2">
+                            <i data-lucide="upload" class="w-4 h-4 text-brand-pine"></i>
+                            Pilih File Audio
+                        </button>
+                        <div id="customAudioName" class="text-xs font-semibold text-brand-pine mt-3 hidden"></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Judul Lagu <span class="text-rose-500">*</span></label>
+                            <input type="text" id="music_title" oninput="triggerAutosave()"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                                   placeholder="Contoh: Sampai Tua Bersama">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Penyanyi / Artis <span class="text-rose-500">*</span></label>
+                            <input type="text" id="music_artist" oninput="triggerAutosave()"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none"
+                                   placeholder="Contoh: Eygra / Akustik Cover">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Preview Audio Element -->
+                <div class="mt-6 pt-4 border-t border-slate-100 flex items-center gap-4 bg-[#FAF8F2] p-4 rounded-2xl border border-[#EDE4D0]">
+                    <button type="button" id="globalPlayBtn" onclick="toggleAudioPreview()" class="w-10 h-10 rounded-full bg-brand-pine text-white flex items-center justify-center flex-shrink-0 hover:bg-brand-charcoal transition">
+                        <i id="globalPlayIcon" data-lucide="play" class="w-5 h-5 ml-0.5 text-brand-gold"></i>
+                    </button>
+                    <div class="flex-1">
+                        <div class="text-xs font-bold text-brand-charcoal" id="audioPlayingTitle">Tidak ada lagu diputar</div>
+                        <div class="text-[11px] text-slate-400" id="audioPlayingArtist">Pilih lagu di atas untuk pratinjau</div>
+                    </div>
+                    <audio id="audioPreviewPlayer" class="hidden"></audio>
+                </div>
+
+                <!-- ================= PRATINJAU & SIMPAN DATA CARD ================= -->
+                <div class="mt-8 pt-6 border-t border-[#EDE4D0] bg-[#FAF8F2] p-6 rounded-3xl border">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h3 class="text-base font-bold text-brand-charcoal flex items-center gap-2">
+                                <i data-lucide="clipboard-check" class="w-5 h-5 text-brand-pine"></i>
+                                Pratinjau & Simpan Seluruh Data
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-1">Periksa kembali data undangan Anda sebelum disimpan secara lengkap ke dalam sistem.</p>
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <button type="button" onclick="openPreviewModal()"
+                                    class="px-4 py-2.5 bg-white hover:bg-slate-50 text-brand-charcoal text-xs font-semibold rounded-xl border border-[#EDE4D0] shadow-sm transition flex items-center gap-2">
+                                <i data-lucide="eye" class="w-4 h-4 text-brand-pine"></i>
+                                <span>Pratinjau Data</span>
+                            </button>
+                            <button type="button" onclick="saveFinalData()"
+                                    class="px-5 py-2.5 bg-brand-pine hover:bg-brand-charcoal text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-2 border border-brand-pine">
+                                <i data-lucide="save" class="w-4 h-4 text-brand-gold"></i>
+                                <span>Simpan Data Undangan</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Sticky Navigation Bar for HP / Quick Next (Tombol tengah dihapus) -->
+    <div class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#EDE4D0] p-3 z-30 shadow-lg">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <button type="button" onclick="navigateStep(-1)" id="btnPrevStep"
+                    class="px-5 py-2.5 rounded-xl border border-[#EDE4D0] text-xs font-semibold text-brand-charcoal hover:bg-[#FAF8F2] transition flex items-center gap-1.5">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                <span>Sebelumnya</span>
+            </button>
+
+            <!-- Status text center (Tanpa tombol simpan di tengah) -->
+            <div class="text-center text-xs font-medium text-slate-500 hidden sm:block">
+                <span>Data otomatis tersimpan saat Anda mengetik</span>
+            </div>
+
+            <button type="button" onclick="navigateStep(1)" id="btnNextStep"
+                    class="px-5 py-2.5 rounded-xl bg-brand-pine text-brand-gold text-xs font-semibold hover:bg-brand-charcoal shadow-sm transition flex items-center gap-1.5 border border-brand-pine">
+                <span id="btnNextStepText">Selanjutnya</span>
+                <i id="btnNextStepIcon" data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- Modern Preview Data Modal -->
+<div id="previewDataModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#EDE4D0] toast-animate-in">
+        
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-[#EDE4D0] flex items-center justify-between bg-[#FAF8F2] rounded-t-3xl">
+            <div class="flex items-center gap-2.5">
+                <span class="w-9 h-9 rounded-xl bg-brand-pine text-brand-gold flex items-center justify-center font-bold">
+                    <i data-lucide="eye" class="w-5 h-5"></i>
+                </span>
+                <div>
+                    <h3 class="text-base font-bold text-brand-charcoal">Pratinjau Data Undangan</h3>
+                    <p class="text-xs text-slate-500">Periksa ringkasan seluruh data yang telah Anda isi</p>
+                </div>
+            </div>
+            <button type="button" onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body (Scrollable) -->
+        <div class="p-6 overflow-y-auto space-y-6 text-xs text-slate-700 flex-1" id="previewModalContent">
+            <!-- Dynamically populated by JS -->
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 border-t border-[#EDE4D0] bg-[#FAF8F2] rounded-b-3xl flex items-center justify-end gap-3">
+            <button type="button" onclick="closePreviewModal()"
+                    class="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white transition">
+                Tutup Pratinjau
+            </button>
+            <button type="button" onclick="saveFinalData(true)"
+                    class="px-5 py-2.5 bg-brand-pine hover:bg-brand-charcoal text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-2 border border-brand-pine">
+                <i data-lucide="check" class="w-4 h-4 text-brand-gold"></i>
+                <span>Simpan Data Undangan</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modern Success Pop-Up Dialog ("Simpan data dengan pop up jika berhasil") -->
+<div id="saveSuccessModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-7 shadow-2xl text-center space-y-4 border border-[#EDE4D0] toast-animate-in">
+        <div class="w-16 h-16 rounded-3xl bg-brand-100 text-brand-pine flex items-center justify-center mx-auto border border-brand-pine/20">
+            <i data-lucide="check-check" class="w-8 h-8 text-brand-pine"></i>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-brand-charcoal">Data Berhasil Disimpan!</h3>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                Seluruh data undangan pernikahan Anda telah berhasil disimpan dengan aman ke dalam sistem kami.
+            </p>
+        </div>
+        <div class="pt-2">
+            <button type="button" onclick="closeSaveSuccessModal()"
+                    class="w-full py-3 bg-brand-pine hover:bg-brand-charcoal text-white rounded-xl text-xs font-semibold shadow-md transition border border-brand-pine">
+                Tutup & Selesai
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="passwordModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl space-y-4 border border-[#EDE4D0] toast-animate-in">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 class="text-base font-bold text-brand-charcoal flex items-center gap-2">
+                <i data-lucide="key" class="w-4 h-4 text-brand-pine"></i>
+                Ganti Password Akun
+            </h3>
+            <button type="button" onclick="closePasswordModal()" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <form onsubmit="submitChangePassword(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Password Lama</label>
+                <input type="password" id="pwOld" required
+                       class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Password Baru (Minimal 6 karakter)</label>
+                <input type="password" id="pwNew" minlength="6" required
+                       class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none">
+            </div>
+            <button type="submit"
+                    class="w-full py-2.5 bg-brand-pine hover:bg-brand-charcoal text-brand-gold rounded-xl text-xs font-semibold shadow-md transition">
+                Simpan Password Baru
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Global state
+    const CLIENT_ID = {{ client_id or 'null' }};
+    const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+    let weddingState = {};
+    let presetMusics = [];
+    let activeTab = 'overview';
+    let autosaveTimeout = null;
+
+    const TAB_ORDER = ['overview', 'theme', 'groom_bride', 'events', 'story', 'gifts', 'inviters', 'music'];
+
+    // Load initial data
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadClientData();
+        lucide.createIcons();
+    });
+
+    async function loadClientData() {
+        try {
+            const url = IS_ADMIN ? `/api/client/data?client_id=${CLIENT_ID}` : '/api/client/data';
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message || 'Gagal memuat data.', 'error');
+                return;
+            }
+
+            presetMusics = data.preset_musics || [];
+            weddingState = data.wedding_data || {};
+
+            // Render Client Info
+            const displayName = data.client.couple_name && data.client.couple_name !== data.client.username 
+                                ? data.client.couple_name 
+                                : `Client: ${data.client.username}`;
+            document.getElementById('headerCoupleName').innerText = displayName;
+            
+            const statusBadge = document.getElementById('clientStatusBadge');
+            statusBadge.innerText = data.client.order_status || 'Menunggu data';
+            if (data.client.order_status === 'Selesai') {
+                statusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-[#33443C] text-white';
+            } else if (data.client.order_status === 'Sedang dikerjakan') {
+                statusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-[#EACE9C] text-[#292929] border border-[#D5B47B]';
+            } else if (data.client.order_status === 'Data lengkap') {
+                statusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-[#FAF8F2] text-brand-pine border border-brand-pine';
+            }
+
+            // Populate forms
+            renderPresetMusics();
+            populateFormValues();
+            updateProgressBadges(weddingState.section_statuses || {}, weddingState.completion_percent || 0);
+
+        } catch (e) {
+            console.error(e);
+            showToast('Koneksi terputus saat memuat data.', 'error');
+        }
+    }
+
+    function populateFormValues() {
+        // Theme (Hanya input nama tema)
+        document.getElementById('theme_name').value = weddingState.theme_name || '';
+
+        // Groom
+        document.getElementById('groom_name').value = weddingState.groom_name || '';
+        document.getElementById('groom_nickname').value = weddingState.groom_nickname || '';
+        document.getElementById('groom_child_order').value = weddingState.groom_child_order || '';
+        document.getElementById('groom_father').value = weddingState.groom_father || '';
+        document.getElementById('groom_mother').value = weddingState.groom_mother || '';
+        document.getElementById('groom_instagram').value = weddingState.groom_instagram || '';
+        if (weddingState.groom_photo) {
+            setPreviewPhoto('groom_photo', weddingState.groom_photo);
+        }
+
+        // Bride
+        document.getElementById('bride_name').value = weddingState.bride_name || '';
+        document.getElementById('bride_nickname').value = weddingState.bride_nickname || '';
+        document.getElementById('bride_child_order').value = weddingState.bride_child_order || '';
+        document.getElementById('bride_father').value = weddingState.bride_father || '';
+        document.getElementById('bride_mother').value = weddingState.bride_mother || '';
+        document.getElementById('bride_instagram').value = weddingState.bride_instagram || '';
+        if (weddingState.bride_photo) {
+            setPreviewPhoto('bride_photo', weddingState.bride_photo);
+        }
+
+        // Events
+        renderEventsList(weddingState.events || []);
+
+        // Stories
+        renderStoriesList(weddingState.love_stories || []);
+
+        // Gifts (QRIS dihapus)
+        const gifts = weddingState.gifts || {};
+        renderBankAccounts(gifts.bank_accounts || []);
+        renderEwallets(gifts.ewallets || []);
+        const phys = gifts.physical_gift || {};
+        document.getElementById('physical_recipient').value = phys.recipient || '';
+        document.getElementById('physical_phone').value = phys.phone || '';
+        document.getElementById('physical_address').value = phys.address || '';
+
+        // Inviters
+        renderInvitersList(weddingState.guest_inviters || []);
+
+        // Music
+        setMusicChoiceType(weddingState.music_choice_type || 'preset', false);
+        document.getElementById('music_title').value = weddingState.music_title || '';
+        document.getElementById('music_artist').value = weddingState.music_artist || '';
+        if (weddingState.music_custom_file) {
+            const cName = document.getElementById('customAudioName');
+            cName.innerText = 'File terunggah: ' + weddingState.music_custom_file.split('/').pop();
+            cName.classList.remove('hidden');
+        }
+    }
+
+    // ----------------- TAB SWITCHING -----------------
+    function switchTab(tabId) {
+        activeTab = tabId;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.getElementById(`tab-${tabId}`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.add('hidden'));
+        const activePane = document.getElementById(`section-${tabId}`);
+        if (activePane) activePane.classList.remove('hidden');
+
+        // Update bottom next button text if on last step
+        const nextText = document.getElementById('btnNextStepText');
+        const nextIcon = document.getElementById('btnNextStepIcon');
+        if (tabId === 'music') {
+            nextText.innerText = 'Pratinjau Data';
+            nextIcon.setAttribute('data-lucide', 'eye');
+        } else {
+            nextText.innerText = 'Selanjutnya';
+            nextIcon.setAttribute('data-lucide', 'chevron-right');
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        lucide.createIcons();
+    }
+
+    function navigateStep(direction) {
+        const idx = TAB_ORDER.indexOf(activeTab);
+        if (direction === 1 && activeTab === 'music') {
+            // Open preview on clicking next from music
+            openPreviewModal();
+            return;
+        }
+        let nextIdx = idx + direction;
+        if (nextIdx < 0) nextIdx = 0;
+        if (nextIdx >= TAB_ORDER.length) nextIdx = TAB_ORDER.length - 1;
+        switchTab(TAB_ORDER[nextIdx]);
+    }
+
+    // ----------------- DETAIL ACARA (MULTI) -----------------
+    function renderEventsList(events) {
+        const container = document.getElementById('eventsList');
+        container.innerHTML = '';
+        if (!events || events.length === 0) {
+            events = [{ id: 1, name: 'Akad Nikah', date: '', start_time: '08:00', end_time: '10:00', location_name: '', address: '', maps_url: '' }];
+            weddingState.events = events;
+        }
+
+        events.forEach((ev, idx) => {
+            const row = document.createElement('div');
+            row.className = 'p-5 rounded-2xl border border-[#EDE4D0] bg-[#FAF8F2] space-y-4';
+            row.innerHTML = `
+                <div class="flex items-center justify-between pb-3 border-b border-[#EDE4D0]">
+                    <span class="text-xs font-bold uppercase tracking-wider text-brand-pine flex items-center gap-2">
+                        <i data-lucide="map-pin" class="w-4 h-4"></i> Acara #${idx + 1}
+                    </span>
+                    ${events.length > 1 ? `
+                    <button type="button" onclick="removeEventRow(${idx})" class="text-xs text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus Acara
+                    </button>` : ''}
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Acara <span class="text-rose-500">*</span></label>
+                        <input type="text" value="${ev.name || ''}" oninput="updateEventField(${idx}, 'name', this.value)"
+                               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white"
+                               placeholder="Akad Nikah / Resepsi">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Acara <span class="text-rose-500">*</span></label>
+                        <input type="date" value="${ev.date || ''}" onchange="updateEventField(${idx}, 'date', this.value)"
+                               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Mulai</label>
+                            <input type="time" value="${ev.start_time || ''}" onchange="updateEventField(${idx}, 'start_time', this.value)"
+                                   class="w-full px-2 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Selesai</label>
+                            <input type="time" value="${ev.end_time || ''}" onchange="updateEventField(${idx}, 'end_time', this.value)"
+                                   class="w-full px-2 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white">
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lokasi / Gedung <span class="text-rose-500">*</span></label>
+                        <input type="text" value="${ev.location_name || ''}" oninput="updateEventField(${idx}, 'location_name', this.value)"
+                               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white"
+                               placeholder="Contoh: Grand Ballroom Hotel Mulia">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Tautan Google Maps</label>
+                        <input type="url" value="${ev.maps_url || ''}" oninput="updateEventField(${idx}, 'maps_url', this.value)"
+                               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white"
+                               placeholder="https://maps.google.com/...">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Alamat Lengkap Lokasi</label>
+                        <textarea oninput="updateEventField(${idx}, 'address', this.value)" rows="2"
+                                  class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white"
+                                  placeholder="Jl. Nama Jalan No. XX, Kelurahan, Kecamatan...">${ev.address || ''}</textarea>
+                    </div>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+        lucide.createIcons();
+    }
+
+    function addEventRow() {
+        if (!weddingState.events) weddingState.events = [];
+        weddingState.events.push({
+            id: Date.now(),
+            name: '',
+            date: '',
+            start_time: '10:00',
+            end_time: '13:00',
+            location_name: '',
+            address: '',
+            maps_url: ''
+        });
+        renderEventsList(weddingState.events);
+        triggerAutosave();
+        showToast('Acara baru ditambahkan', 'info', 2000);
+    }
+
+    function removeEventRow(idx) {
+        weddingState.events.splice(idx, 1);
+        renderEventsList(weddingState.events);
+        triggerAutosave();
+    }
+
+    function updateEventField(idx, field, val) {
+        if (!weddingState.events[idx]) return;
+        weddingState.events[idx][field] = val;
+        triggerAutosave();
+    }
+
+    // ----------------- LOVE STORY (MULTI) -----------------
+    function renderStoriesList(stories) {
+        const container = document.getElementById('storiesList');
+        container.innerHTML = '';
+        if (!stories || stories.length === 0) {
+            stories = [{ id: 1, title: 'Pertama Kali Bertemu', date_or_year: '2021', story_text: '', photo: '' }];
+            weddingState.love_stories = stories;
+        }
+
+        stories.forEach((st, idx) => {
+            const row = document.createElement('div');
+            row.className = 'p-5 rounded-2xl border border-[#EDE4D0] bg-[#FAF8F2] space-y-4';
+            row.innerHTML = `
+                <div class="flex items-center justify-between pb-3 border-b border-[#EDE4D0]">
+                    <span class="text-xs font-bold uppercase tracking-wider text-brand-pine flex items-center gap-2">
+                        <i data-lucide="heart" class="w-4 h-4"></i> Cerita #${idx + 1}
+                    </span>
+                    ${stories.length > 1 ? `
+                    <button type="button" onclick="removeStoryRow(${idx})" class="text-xs text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus Cerita
+                    </button>` : ''}
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Judul Momen <span class="text-rose-500">*</span></label>
+                        <input type="text" value="${st.title || ''}" oninput="updateStoryField(${idx}, 'title', this.value)"
+                               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white"
+                               placeholder="Contoh: Cinta Pandangan Pertama">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Waktu / Tahun</label>
+                        <input type="text" value="${st.date_or_year || ''}" oninput="updateStoryField(${idx}, 'date_or_year', this.value)"
+                               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white"
+                               placeholder="Contoh: 14 Februari 2022">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Isi Cerita <span class="text-rose-500">*</span></label>
+                        <textarea oninput="updateStoryField(${idx}, 'story_text', this.value)" rows="3"
+                                  class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-brand-pine outline-none bg-white"
+                                  placeholder="Ceritakan momen indah ini secara singkat...">${st.story_text || ''}</textarea>
+                    </div>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+        lucide.createIcons();
+    }
+
+    function addStoryRow() {
+        if (!weddingState.love_stories) weddingState.love_stories = [];
+        weddingState.love_stories.push({ id: Date.now(), title: '', date_or_year: '', story_text: '', photo: '' });
+        renderStoriesList(weddingState.love_stories);
+        triggerAutosave();
+        showToast('Cerita baru ditambahkan', 'info', 2000);
+    }
+
+    function removeStoryRow(idx) {
+        weddingState.love_stories.splice(idx, 1);
+        renderStoriesList(weddingState.love_stories);
+        triggerAutosave();
+    }
+
+    function updateStoryField(idx, field, val) {
+        if (!weddingState.love_stories[idx]) return;
+        weddingState.love_stories[idx][field] = val;
+        triggerAutosave();
+    }
+
+    // ----------------- KADO DIGITAL (BANK & EWALLET TANPA QRIS) -----------------
+    function renderBankAccounts(banks) {
+        const container = document.getElementById('bankAccountsList');
+        container.innerHTML = '';
+        banks.forEach((b, idx) => {
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-1 sm:grid-cols-3 gap-3 items-center p-3 rounded-xl bg-[#FAF8F2] border border-[#EDE4D0]';
+            row.innerHTML = `
+                <div>
+                    <input type="text" value="${b.bank_name || ''}" oninput="updateBankField(${idx}, 'bank_name', this.value)"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:border-brand-pine outline-none"
+                           placeholder="Nama Bank (BCA, Mandiri, BRI...)">
+                </div>
+                <div>
+                    <input type="text" value="${b.account_number || ''}" oninput="updateBankField(${idx}, 'account_number', this.value)"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:border-brand-pine outline-none"
+                           placeholder="Nomor Rekening">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="text" value="${b.account_holder || ''}" oninput="updateBankField(${idx}, 'account_holder', this.value)"
+                           class="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:border-brand-pine outline-none"
+                           placeholder="Atas Nama Pemilik">
+                    <button type="button" onclick="removeBankRow(${idx})" class="p-2 text-rose-500 hover:text-rose-700">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+        lucide.createIcons();
+    }
+
+    function addBankRow() {
+        if (!weddingState.gifts) weddingState.gifts = {};
+        if (!weddingState.gifts.bank_accounts) weddingState.gifts.bank_accounts = [];
+        weddingState.gifts.bank_accounts.push({ bank_name: '', account_number: '', account_holder: '' });
+        renderBankAccounts(weddingState.gifts.bank_accounts);
+        triggerAutosave();
+        showToast('Rekening bank ditambahkan', 'info', 2000);
+    }
+
+    function removeBankRow(idx) {
+        weddingState.gifts.bank_accounts.splice(idx, 1);
+        renderBankAccounts(weddingState.gifts.bank_accounts);
+        triggerAutosave();
+    }
+
+    function updateBankField(idx, field, val) {
+        weddingState.gifts.bank_accounts[idx][field] = val;
+        triggerAutosave();
+    }
+
+    function renderEwallets(ewallets) {
+        const container = document.getElementById('ewalletsList');
+        container.innerHTML = '';
+        ewallets.forEach((e, idx) => {
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-1 sm:grid-cols-3 gap-3 items-center p-3 rounded-xl bg-[#FAF8F2] border border-[#EDE4D0]';
+            row.innerHTML = `
+                <div>
+                    <input type="text" value="${e.provider || ''}" oninput="updateEwalletField(${idx}, 'provider', this.value)"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:border-brand-pine outline-none"
+                           placeholder="Provider (GoPay, Dana, OVO...)">
+                </div>
+                <div>
+                    <input type="text" value="${e.number || ''}" oninput="updateEwalletField(${idx}, 'number', this.value)"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:border-brand-pine outline-none"
+                           placeholder="Nomor Handphone">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="text" value="${e.account_holder || ''}" oninput="updateEwalletField(${idx}, 'account_holder', this.value)"
+                           class="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:border-brand-pine outline-none"
+                           placeholder="Atas Nama Akun">
+                    <button type="button" onclick="removeEwalletRow(${idx})" class="p-2 text-rose-500 hover:text-rose-700">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+        lucide.createIcons();
+    }
+
+    function addEwalletRow() {
+        if (!weddingState.gifts) weddingState.gifts = {};
+        if (!weddingState.gifts.ewallets) weddingState.gifts.ewallets = [];
+        weddingState.gifts.ewallets.push({ provider: '', number: '', account_holder: '' });
+        renderEwallets(weddingState.gifts.ewallets);
+        triggerAutosave();
+        showToast('E-Wallet ditambahkan', 'info', 2000);
+    }
+
+    function removeEwalletRow(idx) {
+        weddingState.gifts.ewallets.splice(idx, 1);
+        renderEwallets(weddingState.gifts.ewallets);
+        triggerAutosave();
+    }
+
+    function updateEwalletField(idx, field, val) {
+        weddingState.gifts.ewallets[idx][field] = val;
+        triggerAutosave();
+    }
+
+    // ----------------- TURUT MENGUNDANG (REORDERABLE) -----------------
+    function renderInvitersList(inviters) {
+        const container = document.getElementById('invitersList');
+        container.innerHTML = '';
+        if (!inviters || inviters.length === 0) {
+            inviters = [{ id: 1, name: '' }];
+            weddingState.guest_inviters = inviters;
+        }
+
+        inviters.forEach((inv, idx) => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-3 p-3 rounded-xl bg-[#FAF8F2] border border-[#EDE4D0]';
+            row.innerHTML = `
+                <span class="w-6 text-center text-xs font-bold text-slate-400">${idx + 1}.</span>
+                <input type="text" value="${inv.name || ''}" oninput="updateInviterName(${idx}, this.value)"
+                       class="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:border-brand-pine outline-none"
+                       placeholder="Contoh: Keluarga Besar Bpk. H. Ahmad Soeparno">
+                <div class="flex items-center gap-1">
+                    <button type="button" onclick="moveInviter(${idx}, -1)" class="p-1.5 rounded text-slate-500 hover:text-brand-charcoal hover:bg-[#EDE4D0] transition ${idx === 0 ? 'opacity-30 pointer-events-none' : ''}" title="Geser ke Atas">
+                        <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" onclick="moveInviter(${idx}, 1)" class="p-1.5 rounded text-slate-500 hover:text-brand-charcoal hover:bg-[#EDE4D0] transition ${idx === inviters.length - 1 ? 'opacity-30 pointer-events-none' : ''}" title="Geser ke Bawah">
+                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" onclick="removeInviterRow(${idx})" class="p-1.5 rounded text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Hapus">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+        lucide.createIcons();
+    }
+
+    function addInviterRow() {
+        if (!weddingState.guest_inviters) weddingState.guest_inviters = [];
+        weddingState.guest_inviters.push({ id: Date.now(), name: '' });
+        renderInvitersList(weddingState.guest_inviters);
+        triggerAutosave();
+        showToast('Kolom nama ditambahkan', 'info', 2000);
+    }
+
+    function removeInviterRow(idx) {
+        weddingState.guest_inviters.splice(idx, 1);
+        renderInvitersList(weddingState.guest_inviters);
+        triggerAutosave();
+    }
+
+    function updateInviterName(idx, val) {
+        weddingState.guest_inviters[idx].name = val;
+        triggerAutosave();
+    }
+
+    function moveInviter(idx, direction) {
+        const target = idx + direction;
+        if (target < 0 || target >= weddingState.guest_inviters.length) return;
+        const temp = weddingState.guest_inviters[idx];
+        weddingState.guest_inviters[idx] = weddingState.guest_inviters[target];
+        weddingState.guest_inviters[target] = temp;
+        renderInvitersList(weddingState.guest_inviters);
+        triggerAutosave();
+    }
+
+    // ----------------- BACKSOUND & AUDIO PLAYER -----------------
+    function setMusicChoiceType(type, triggerSave = true) {
+        weddingState.music_choice_type = type;
+        const btnPreset = document.getElementById('btnMusicTypePreset');
+        const btnUpload = document.getElementById('btnMusicTypeUpload');
+        const cPreset = document.getElementById('musicPresetContainer');
+        const cUpload = document.getElementById('musicUploadContainer');
+
+        if (type === 'preset') {
+            btnPreset.className = 'flex-1 py-2 text-xs font-bold rounded-xl transition text-brand-charcoal bg-white shadow-sm flex items-center justify-center gap-2';
+            btnUpload.className = 'flex-1 py-2 text-xs font-bold rounded-xl transition text-slate-500 hover:text-brand-charcoal flex items-center justify-center gap-2';
+            cPreset.classList.remove('hidden');
+            cUpload.classList.add('hidden');
+        } else {
+            btnUpload.className = 'flex-1 py-2 text-xs font-bold rounded-xl transition text-brand-charcoal bg-white shadow-sm flex items-center justify-center gap-2';
+            btnPreset.className = 'flex-1 py-2 text-xs font-bold rounded-xl transition text-slate-500 hover:text-brand-charcoal flex items-center justify-center gap-2';
+            cUpload.classList.remove('hidden');
+            cPreset.classList.add('hidden');
+        }
+        if (triggerSave) triggerAutosave();
+    }
+
+    function renderPresetMusics() {
+        const container = document.getElementById('presetMusicsList');
+        container.innerHTML = '';
+        const currentMusicId = weddingState.music_preset_id || 1;
+
+        presetMusics.forEach(m => {
+            const isChosen = m.id == currentMusicId && (weddingState.music_choice_type === 'preset' || !weddingState.music_choice_type);
+            const row = document.createElement('div');
+            row.className = `p-4 rounded-2xl border flex items-center justify-between gap-4 transition ${isChosen ? 'border-brand-pine bg-[#FAF8F2] shadow-sm' : 'border-slate-200 bg-white hover:border-[#EDE4D0]'}`;
+            row.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="playMusicFile('${m.file_path}', '${m.title}', '${m.artist}')"
+                            class="w-9 h-9 rounded-full bg-brand-100 hover:bg-brand-gold text-brand-pine flex items-center justify-center transition flex-shrink-0">
+                        <i data-lucide="play" class="w-4 h-4 ml-0.5"></i>
+                    </button>
+                    <div>
+                        <h4 class="text-xs font-bold text-brand-charcoal">${m.title}</h4>
+                        <p class="text-[11px] text-slate-500">${m.artist} • ${m.duration || '03:30'}</p>
+                    </div>
+                </div>
+                <button type="button" onclick="selectPresetMusic(${m.id}, '${m.title}', '${m.artist}')"
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold transition ${isChosen ? 'bg-brand-pine text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+                    ${isChosen ? '✓ Lagu Dipilih' : 'Pilih'}
+                </button>
+            `;
+            container.appendChild(row);
+        });
+        lucide.createIcons();
+    }
+
+    function selectPresetMusic(id, title, artist) {
+        weddingState.music_preset_id = id;
+        weddingState.music_title = title;
+        weddingState.music_artist = artist;
+        weddingState.music_choice_type = 'preset';
+        renderPresetMusics();
+        triggerAutosave();
+        showToast(`Lagu "${title}" dipilih`, 'success', 2500);
+    }
+
+    let isAudioPlaying = false;
+    function playMusicFile(path, title, artist) {
+        const audio = document.getElementById('audioPreviewPlayer');
+        const icon = document.getElementById('globalPlayIcon');
+        document.getElementById('audioPlayingTitle').innerText = title;
+        document.getElementById('audioPlayingArtist').innerText = artist;
+
+        audio.src = path;
+        audio.play().then(() => {
+            isAudioPlaying = true;
+            icon.setAttribute('data-lucide', 'pause');
+            lucide.createIcons();
+        }).catch(e => console.warn('Audio play restricted:', e));
+    }
+
+    function toggleAudioPreview() {
+        const audio = document.getElementById('audioPreviewPlayer');
+        const icon = document.getElementById('globalPlayIcon');
+        if (!audio.src) {
+            if (presetMusics.length > 0) {
+                playMusicFile(presetMusics[0].file_path, presetMusics[0].title, presetMusics[0].artist);
+            }
+            return;
+        }
+        if (isAudioPlaying) {
+            audio.pause();
+            isAudioPlaying = false;
+            icon.setAttribute('data-lucide', 'play');
+        } else {
+            audio.play();
+            isAudioPlaying = true;
+            icon.setAttribute('data-lucide', 'pause');
+        }
+        lucide.createIcons();
+    }
+
+    // ----------------- FILE UPLOADS -----------------
+    async function uploadImage(inputElem, fieldKey) {
+        if (!inputElem.files || !inputElem.files[0]) return;
+        const file = inputElem.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Ukuran file foto maksimal 5 MB.', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'photo');
+
+        setSaveIndicator('saving', 'Mengunggah foto...');
+
+        try {
+            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                weddingState[fieldKey] = data.url;
+                setPreviewPhoto(fieldKey, data.url);
+                triggerAutosave();
+                showToast('Foto berhasil diunggah.', 'success');
+            } else {
+                showToast(data.message || 'Gagal mengunggah foto.', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('Koneksi terputus saat mengunggah.', 'error');
+        }
+    }
+
+    function setPreviewPhoto(fieldKey, url) {
+        const img = document.getElementById(`${fieldKey}_preview`);
+        const placeholder = document.getElementById(`${fieldKey}_placeholder`);
+        if (img && url) {
+            img.src = url;
+            img.classList.remove('hidden');
+            if (placeholder) placeholder.classList.add('hidden');
+        }
+    }
+
+    async function uploadAudio(inputElem) {
+        if (!inputElem.files || !inputElem.files[0]) return;
+        const file = inputElem.files[0];
+        if (file.size > 10 * 1024 * 1024) {
+            showToast('Ukuran file audio maksimal 10 MB.', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'music');
+
+        setSaveIndicator('saving', 'Mengunggah musik...');
+
+        try {
+            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                weddingState.music_custom_file = data.url;
+                weddingState.music_choice_type = 'upload';
+                const cName = document.getElementById('customAudioName');
+                cName.innerText = 'File terunggah: ' + file.name;
+                cName.classList.remove('hidden');
+
+                if (!document.getElementById('music_title').value) {
+                    document.getElementById('music_title').value = file.name.replace(/\.[^/.]+$/, "");
+                }
+                triggerAutosave();
+                playMusicFile(data.url, document.getElementById('music_title').value, 'Audio Unggahan');
+                showToast('Musik berhasil diunggah.', 'success');
+            } else {
+                showToast(data.message || 'Gagal mengunggah audio.', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('Koneksi terputus saat mengunggah musik.', 'error');
+        }
+    }
+
+    // ----------------- AUTOSAVE ENGINE -----------------
+    function triggerAutosave() {
+        setSaveIndicator('saving', 'Menyimpan perubahan...');
+        clearTimeout(autosaveTimeout);
+        autosaveTimeout = setTimeout(performSave, 600); // 600ms debounce
+    }
+
+    async function performSave() {
+        const payload = {
+            client_id: CLIENT_ID,
+            theme_name: document.getElementById('theme_name').value,
+
+            groom_name: document.getElementById('groom_name').value,
+            groom_nickname: document.getElementById('groom_nickname').value,
+            groom_photo: weddingState.groom_photo || '',
+            groom_child_order: document.getElementById('groom_child_order').value,
+            groom_father: document.getElementById('groom_father').value,
+            groom_mother: document.getElementById('groom_mother').value,
+            groom_instagram: document.getElementById('groom_instagram').value,
+
+            bride_name: document.getElementById('bride_name').value,
+            bride_nickname: document.getElementById('bride_nickname').value,
+            bride_photo: weddingState.bride_photo || '',
+            bride_child_order: document.getElementById('bride_child_order').value,
+            bride_father: document.getElementById('bride_father').value,
+            bride_mother: document.getElementById('bride_mother').value,
+            bride_instagram: document.getElementById('bride_instagram').value,
+
+            events: weddingState.events || [],
+            love_stories: weddingState.love_stories || [],
+            gifts: {
+                bank_accounts: (weddingState.gifts && weddingState.gifts.bank_accounts) || [],
+                ewallets: (weddingState.gifts && weddingState.gifts.ewallets) || [],
+                physical_gift: {
+                    recipient: document.getElementById('physical_recipient').value,
+                    phone: document.getElementById('physical_phone').value,
+                    address: document.getElementById('physical_address').value
+                }
+            },
+            guest_inviters: weddingState.guest_inviters || [],
+
+            music_choice_type: weddingState.music_choice_type || 'preset',
+            music_preset_id: weddingState.music_preset_id || 1,
+            music_custom_file: weddingState.music_custom_file || '',
+            music_title: document.getElementById('music_title').value,
+            music_artist: document.getElementById('music_artist').value
+        };
+
+        try {
+            const res = await fetch('/api/client/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                setSaveIndicator('saved', `Tersimpan ${data.saved_at}`);
+                updateProgressBadges(data.section_statuses, data.completion_percent);
+                return true;
+            } else {
+                setSaveIndicator('error', 'Gagal menyimpan');
+                return false;
+            }
+        } catch (e) {
+            console.error(e);
+            setSaveIndicator('error', 'Koneksi bermasalah');
+            return false;
+        }
+    }
+
+    function setSaveIndicator(status, text) {
+        const dot = document.getElementById('saveStatusDot');
+        const txt = document.getElementById('saveStatusText');
+        txt.innerText = text;
+
+        if (status === 'saving') {
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-brand-gold animate-ping';
+        } else if (status === 'saved') {
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-brand-pine';
+        } else {
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+        }
+    }
+
+    function updateProgressBadges(statuses, pct) {
+        // Overall bar
+        document.getElementById('overallProgressText').innerText = `${pct}%`;
+        document.getElementById('overallProgressBar').style.width = `${pct}%`;
+
+        // Section badges
+        const keys = ['theme', 'groom_bride', 'events', 'story', 'gifts', 'inviters', 'music'];
+        keys.forEach(k => {
+            const st = statuses[k] || 'empty';
+            let label = 'Belum diisi';
+            let cls = 'badge-empty';
+
+            if (st === 'complete') {
+                label = 'Lengkap';
+                cls = 'badge-complete';
+            } else if (st === 'partial') {
+                label = 'Sebagian';
+                cls = 'badge-partial';
+            }
+
+            const b1 = document.getElementById(`badge-${k}`);
+            if (b1) {
+                b1.innerText = label;
+                b1.className = `text-[10px] px-1.5 py-0.2 rounded-full font-bold ${cls}`;
+            }
+
+            const b2 = document.getElementById(`card-badge-${k}`);
+            if (b2) {
+                b2.innerText = label;
+                b2.className = `text-xs px-2.5 py-0.5 rounded-full font-semibold ${cls}`;
+            }
+        });
+    }
+
+    // ================= PREVIEW DATA MODAL =================
+    function openPreviewModal() {
+        const container = document.getElementById('previewModalContent');
+        
+        const themeName = document.getElementById('theme_name').value || '-';
+        const gName = document.getElementById('groom_name').value || '-';
+        const gNick = document.getElementById('groom_nickname').value || '-';
+        const gParents = `Bpk. ${document.getElementById('groom_father').value || '-'} & Ibu ${document.getElementById('groom_mother').value || '-'}`;
+        const gOrder = document.getElementById('groom_child_order').value || '-';
+        const gIg = document.getElementById('groom_instagram').value || '-';
+
+        const bName = document.getElementById('bride_name').value || '-';
+        const bNick = document.getElementById('bride_nickname').value || '-';
+        const bParents = `Bpk. ${document.getElementById('bride_father').value || '-'} & Ibu ${document.getElementById('bride_mother').value || '-'}`;
+        const bOrder = document.getElementById('bride_child_order').value || '-';
+        const bIg = document.getElementById('bride_instagram').value || '-';
+
+        const events = weddingState.events || [];
+        const stories = weddingState.love_stories || [];
+        const gifts = weddingState.gifts || {};
+        const banks = gifts.bank_accounts || [];
+        const ewallets = gifts.ewallets || [];
+        const phys = gifts.physical_gift || {};
+        const inviters = weddingState.guest_inviters || [];
+        
+        const musicTitle = document.getElementById('music_title').value || '-';
+        const musicArtist = document.getElementById('music_artist').value || '-';
+
+        container.innerHTML = `
+            <!-- 1. Tema -->
+            <div class="p-4 rounded-2xl bg-[#FAF8F2] border border-[#EDE4D0]">
+                <div class="font-bold text-brand-pine text-xs uppercase tracking-wider mb-1.5">1. Tema Undangan</div>
+                <div class="text-sm font-bold text-brand-charcoal">${themeName}</div>
+            </div>
+
+            <!-- 2. Biodata -->
+            <div class="p-4 rounded-2xl bg-[#FAF8F2] border border-[#EDE4D0] space-y-3">
+                <div class="font-bold text-brand-pine text-xs uppercase tracking-wider">2. Biodata Mempelai</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="p-3 bg-white rounded-xl border border-slate-100">
+                        <span class="text-[10px] font-bold uppercase text-brand-pine">Mempelai Pria</span>
+                        <div class="font-bold text-sm text-brand-charcoal mt-1">${gName} (${gNick})</div>
+                        <div class="text-[11px] text-slate-500 mt-0.5">${gOrder}</div>
+                        <div class="text-[11px] text-slate-600 mt-1">Orang Tua: ${gParents}</div>
+                        <div class="text-[11px] text-brand-pine font-mono mt-0.5">${gIg}</div>
+                    </div>
+                    <div class="p-3 bg-white rounded-xl border border-slate-100">
+                        <span class="text-[10px] font-bold uppercase text-brand-pine">Mempelai Wanita</span>
+                        <div class="font-bold text-sm text-brand-charcoal mt-1">${bName} (${bNick})</div>
+                        <div class="text-[11px] text-slate-500 mt-0.5">${bOrder}</div>
+                        <div class="text-[11px] text-slate-600 mt-1">Orang Tua: ${bParents}</div>
+                        <div class="text-[11px] text-brand-pine font-mono mt-0.5">${bIg}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Acara -->
+            <div class="p-4 rounded-2xl bg-[#FAF8F2] border border-[#EDE4D0]">
+                <div class="font-bold text-brand-pine text-xs uppercase tracking-wider mb-2">3. Rangkaian Acara (${events.length} Acara)</div>
+                <div class="space-y-2">
+                    ${events.map((ev, i) => `
+                        <div class="p-2.5 bg-white rounded-xl border border-slate-100">
+                            <div class="font-bold text-brand-charcoal">${ev.name || 'Acara'} • ${ev.date || '-'} (${ev.start_time || ''} - ${ev.end_time || ''})</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">${ev.location_name || '-'} - ${ev.address || '-'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- 4. Love Story -->
+            <div class="p-4 rounded-2xl bg-[#FAF8F2] border border-[#EDE4D0]">
+                <div class="font-bold text-brand-pine text-xs uppercase tracking-wider mb-2">4. Love Story (${stories.length} Bagian)</div>
+                <div class="space-y-2">
+                    ${stories.map((st, i) => `
+                        <div class="p-2.5 bg-white rounded-xl border border-slate-100">
+                            <div class="font-bold text-brand-charcoal">${st.title || 'Cerita'} <span class="text-slate-400 font-normal">(${st.date_or_year || '-'})</span></div>
+                            <div class="text-[11px] text-slate-600 mt-0.5">${st.story_text || '-'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- 5. Kado Digital -->
+            <div class="p-4 rounded-2xl bg-[#FAF8F2] border border-[#EDE4D0]">
+                <div class="font-bold text-brand-pine text-xs uppercase tracking-wider mb-2">5. Kado Digital & Alamat Pengiriman</div>
+                <div class="space-y-1.5">
+                    ${banks.map(b => `<div class="p-2 bg-white rounded-lg border border-slate-100 text-[11px]">Bank <b>${b.bank_name}</b> - No. ${b.account_number} (a.n. ${b.account_holder})</div>`).join('')}
+                    ${ewallets.map(e => `<div class="p-2 bg-white rounded-lg border border-slate-100 text-[11px]">E-Wallet <b>${e.provider}</b> - No. ${e.number} (a.n. ${e.account_holder})</div>`).join('')}
+                    ${phys.address ? `<div class="p-2 bg-white rounded-lg border border-slate-100 text-[11px]">Alamat Kado Fisik: <b>${phys.recipient} (${phys.phone})</b> - ${phys.address}</div>` : ''}
+                </div>
+            </div>
+
+            <!-- 6. Turut Mengundang -->
+            <div class="p-4 rounded-2xl bg-[#FAF8F2] border border-[#EDE4D0]">
+                <div class="font-bold text-brand-pine text-xs uppercase tracking-wider mb-2">6. Turut Mengundang</div>
+                <div class="text-[11px] text-slate-600 space-y-1">
+                    ${inviters.filter(inv => inv.name).map((inv, idx) => `<div>${idx + 1}. ${inv.name}</div>`).join('') || '<i>(Belum diisi)</i>'}
+                </div>
+            </div>
+
+            <!-- 7. Backsound -->
+            <div class="p-4 rounded-2xl bg-[#FAF8F2] border border-[#EDE4D0]">
+                <div class="font-bold text-brand-pine text-xs uppercase tracking-wider mb-1.5">7. Backsound Musik</div>
+                <div class="text-xs text-brand-charcoal font-semibold">Lagu: ${musicTitle}</div>
+                <div class="text-[11px] text-slate-500">Artis: ${musicArtist}</div>
+            </div>
+        `;
+
+        document.getElementById('previewDataModal').classList.remove('hidden');
+        document.getElementById('previewDataModal').classList.add('flex');
+    }
+
+    function closePreviewModal() {
+        document.getElementById('previewDataModal').classList.add('hidden');
+        document.getElementById('previewDataModal').classList.remove('flex');
+    }
+
+    // ================= SIMPAN DATA FINAL & POP UP SUKSES =================
+    async function saveFinalData(fromModal = false) {
+        if (fromModal) closePreviewModal();
+
+        setSaveIndicator('saving', 'Menyimpan seluruh data...');
+        const success = await performSave();
+        
+        if (success) {
+            // Tampilkan pop-up dialog berhasil seperti yang diminta user!
+            document.getElementById('saveSuccessModal').classList.remove('hidden');
+            document.getElementById('saveSuccessModal').classList.add('flex');
+            lucide.createIcons();
+        } else {
+            showToast('Gagal menyimpan data undangan.', 'error');
+        }
+    }
+
+    function closeSaveSuccessModal() {
+        document.getElementById('saveSuccessModal').classList.add('hidden');
+        document.getElementById('saveSuccessModal').classList.remove('flex');
+        // Switch to overview or stay
+        switchTab('overview');
+    }
+
+    // ----------------- CHANGE PASSWORD MODAL -----------------
+    function openPasswordModal() {
+        document.getElementById('passwordModal').classList.remove('hidden');
+        document.getElementById('passwordModal').classList.add('flex');
+    }
+
+    function closePasswordModal() {
+        document.getElementById('passwordModal').classList.add('hidden');
+        document.getElementById('passwordModal').classList.remove('flex');
+    }
+
+    async function submitChangePassword(e) {
+        e.preventDefault();
+        const old_password = document.getElementById('pwOld').value;
+        const new_password = document.getElementById('pwNew').value;
+
+        try {
+            const res = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_password, new_password })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                closePasswordModal();
+                document.getElementById('pwOld').value = '';
+                document.getElementById('pwNew').value = '';
+            } else {
+                showToast(data.message || 'Gagal mengubah password.', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('Kesalahan koneksi.', 'error');
+        }
+    }
+</script>
+{% endblock %}
